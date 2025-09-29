@@ -13,7 +13,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 
 import asyncio
-
+import aiohttp
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -33,12 +33,12 @@ async def handle_message(message: types.Message):
     await add_user(pool, message.from_user.id)
     stars = await get_stars(pool, message.from_user.id)
     await message.answer(f"You have been registered! You have {stars} stars.")
+    await get_gifts(bot)
 
 @dp.message(Command("create_invoice"))
 async def create_invoice(message: types.Message, state : FSMContext):
     await message.answer("Write in the chat sum that you want to topup your stars balance")
     await state.set_state(Form.top_up_stars_balance)
-
 
 @dp.message(Form.top_up_stars_balance)
 async def topup_balance(message: types.Message, state : FSMContext):
@@ -71,6 +71,16 @@ async def process_successful_payment(message: types.Message):
                          f"Sum: {payment.total_amount} Stars\n"
                          f"Desc: {payment.invoice_payload}")
 
+async def get_gifts(bot : Bot) -> None:
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/payments.getStarGifts"
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json={"hash": 0}) as response:
+            data = await response.json()
+            if data.get("ok"):
+                for gift in data["result"]["gifts"]:
+                    print(f"🎁 {gift.get('emoji', '')} — {gift['star_count']} звёзд (ID: {gift['id']})")
+            else:
+                print("❌ Ошибка:", data)
 async def main():
     global pool
     pool = await connect_db()
